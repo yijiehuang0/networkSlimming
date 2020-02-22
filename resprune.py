@@ -38,12 +38,14 @@ if args.cuda:
 if args.model:
     if os.path.isfile(args.model):
         print("=> loading checkpoint '{}'".format(args.model))
-        checkpoint = torch.load(args.model)
-        args.start_epoch = checkpoint['epoch']
-        best_prec1 = checkpoint['best_prec1']
-        model.load_state_dict(checkpoint['state_dict'])
-        print("=> loaded checkpoint '{}' (epoch {}) Prec1: {:f}"
-              .format(args.model, checkpoint['epoch'], best_prec1))
+        checkpoint = torch.load(args.model) # we load it into here
+        if 'cfg' in checkpoint:
+          print("loaded in cfg into the system")
+          model = resnet(cfg=checkpoint['cfg'], dataset=args.dataset, depth=args.depth)
+          cfgOriginal = cfg=checkpoint['cfg']
+          model.cuda()
+        model.load_state_dict(checkpoint['state_dict'], strict=False)
+        print("=> loaded former Model")
     else:
         print("=> no checkpoint found at '{}'".format(args.resume))
 
@@ -128,7 +130,7 @@ if args.cuda:
     newmodel.cuda()
 
 num_parameters = sum([param.nelement() for param in newmodel.parameters()])
-savepath = os.path.join(args.save, "prune.txt")
+savepath = "prune.txt"
 with open(savepath, "w") as fp:
     fp.write("Configuration: \n"+str(cfg)+"\n")
     fp.write("Number of parameters: \n"+str(num_parameters)+"\n")
@@ -191,6 +193,7 @@ for layer_id in range(len(old_modules)):
             if idx1.size == 1:
                 idx1 = np.resize(idx1, (1,))
             w1 = m0.weight.data[:, idx0.tolist(), :, :].clone()
+            print(w1)
 
             # If the current convolution is not the last convolution in the residual block, then we can change the 
             # number of output channels. Currently we use `conv_count` to detect whether it is such convolution.
@@ -210,7 +213,7 @@ for layer_id in range(len(old_modules)):
         m1.weight.data = m0.weight.data[:, idx0].clone()
         m1.bias.data = m0.bias.data.clone()
 
-torch.save({'cfg': cfg, 'state_dict': newmodel.state_dict()}, os.path.join(args.save, 'pruned.pth.tar'))
+torch.save({'cfg': cfg, 'state_dict': newmodel.state_dict()}, args.save)
 
 print(newmodel)
 model = newmodel
