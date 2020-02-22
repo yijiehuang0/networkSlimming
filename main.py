@@ -14,7 +14,7 @@ import models
 
 # Training settings
 parser = argparse.ArgumentParser(description='PyTorch Slimming CIFAR training')
-parser.add_argument('--dataset', type=str, default='cifar100',
+parser.add_argument('--dataset', type=str, default='cifar10',
                     help='training dataset (default: cifar100)')
 parser.add_argument('--sparsity-regularization', '-sr', dest='sr', action='store_true',
                     help='train with channel sparsity regularization')
@@ -97,8 +97,10 @@ else:
                        ])),
         batch_size=args.test_batch_size, shuffle=True, **kwargs)
 
+cfg = None
 if args.refine:
     checkpoint = torch.load(args.refine)
+    cfg=checkpoint['cfg']
     model = models.__dict__[args.arch](dataset=args.dataset, depth=args.depth, cfg=checkpoint['cfg'])
     model.load_state_dict(checkpoint['state_dict'])
 else:
@@ -145,7 +147,7 @@ def train(epoch):
         if batch_idx % args.log_interval == 0:
             print('Train Epoch: {} [{}/{} ({:.1f}%)]\tLoss: {:.6f}'.format(
                 epoch, batch_idx * len(data), len(train_loader.dataset),
-                100. * batch_idx / len(train_loader), loss.data[0]))
+                100. * batch_idx / len(train_loader), loss.data))
 
 def test():
     model.eval()
@@ -156,20 +158,19 @@ def test():
             data, target = data.cuda(), target.cuda()
         data, target = Variable(data, volatile=True), Variable(target)
         output = model(data)
-        test_loss += F.cross_entropy(output, target, size_average=False).data[0] # sum up batch loss
+        test_loss += F.cross_entropy(output, target, size_average=False).data # sum up batch loss
         pred = output.data.max(1, keepdim=True)[1] # get the index of the max log-probability
         correct += pred.eq(target.data.view_as(pred)).cpu().sum()
-
     test_loss /= len(test_loader.dataset)
     print('\nTest set: Average loss: {:.4f}, Accuracy: {}/{} ({:.1f}%)\n'.format(
         test_loss, correct, len(test_loader.dataset),
         100. * correct / len(test_loader.dataset)))
     return correct / float(len(test_loader.dataset))
 
-def save_checkpoint(state, is_best, filepath):
+def save_checkpoint(state, is_best, filepath= 'checkpoint.pth.tar'):
     torch.save(state, 'checkpoint.pth.tar')
     if is_best:
-        shutil.copyfile(os.path.join('checkpoint.pth.tar', 'model_best.pth.tar'))
+        shutil.copyfile('checkpoint.pth.tar', 'model_best.pth.tar')
 
 best_prec1 = 0.
 for epoch in range(args.start_epoch, args.epochs):
@@ -180,11 +181,20 @@ for epoch in range(args.start_epoch, args.epochs):
     prec1 = test()
     is_best = prec1 > best_prec1
     best_prec1 = max(prec1, best_prec1)
-    save_checkpoint({
-        'epoch': epoch + 1,
-        'state_dict': model.state_dict(),
-        'best_prec1': best_prec1,
-        'optimizer': optimizer.state_dict(),
-    }, is_best, filepath=args.save)
+    if(cfg):
+      save_checkpoint({
+          'epoch': epoch + 1,
+          'state_dict': model.state_dict(),
+          'best_prec1': best_prec1,
+          'optimizer': optimizer.state_dict(),
+          'cfg': cfg,
+      }, is_best)
+    else:
+      save_checkpoint({
+          'epoch': epoch + 1,
+          'state_dict': model.state_dict(),
+          'best_prec1': best_prec1,
+          'optimizer': optimizer.state_dict(),
+      }, is_best)
 
 print("Best accuracy: "+str(best_prec1))
