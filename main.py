@@ -167,9 +167,9 @@ def test():
     return correct / float(len(test_loader.dataset))
 
 def save_checkpoint(state, is_best, filepath):
-    torch.save(state, os.path.join(filepath, 'checkpoint.pth.tar'))
+    torch.save(state, 'checkpoint.pth.tar')
     if is_best:
-        shutil.copyfile(os.path.join(filepath, 'checkpoint.pth.tar'), os.path.join(filepath, 'model_best.pth.tar'))
+        shutil.copyfile(os.path.join('checkpoint.pth.tar', 'model_best.pth.tar'))
 
 best_prec1 = 0.
 for epoch in range(args.start_epoch, args.epochs):
